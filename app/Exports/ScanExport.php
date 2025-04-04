@@ -35,6 +35,7 @@ class ScanExport implements FromCollection, WithHeadings
             "Tracking Number",
             "Scan Out Date",
             "Dispatch Date",
+            "Dispatch User",
             "Weight",
             "Dims",
             "Reason For Cancellation",

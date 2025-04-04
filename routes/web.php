@@ -179,6 +179,8 @@ Route::group(['as'=>'admin.','prefix' => 'admin','namespace'=>'Admin'], function
     Route::post('move/dispatch/store','WarehouseController@moveDispatchedStore')->name('store.move.dispatch');
 
     Route::get('sync/update/location','WarehouseController@cronSyncUpdateLocation')->name('cron.sync.update.location');
+
+    Route::post('ebay/order/data','OrderController@fetchOrCancelEbayOrder')->name('ebay.order');
 });
 
 Route::group(['as'=>'user.','prefix' => 'user','namespace'=>'User', 'middleware' => ['auth', 'user']], function () {

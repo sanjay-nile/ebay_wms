@@ -153,6 +153,14 @@ $(document).ready(function() {
                                             </select>
                                         </div>
                                         <div class="form-group col-md-3">
+                                            <select class="form-control" name="user_id">
+                                                <option value="">-- Select Operator -- </option>
+                                                @foreach($operators as $k => $code)
+                                                    <option value="{{ $code->id }}">{{ $code->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-3">
                                             <input type="hidden" name="export_to" id="export_to" value="">
                                             <button type="submit" class="btn btn-Search" id="search-btn">Search</button>
                                             <a href="{{ route('admin.all.scan.data') }}" class="btn btn-Reset">Reset</a>
@@ -186,6 +194,7 @@ $(document).ready(function() {
                                         <tr>
                                             <th>Action</th>
                                             <th>#Id</th>
+                                            <th>Assigned Operator</th>
                                             <th>Package ID</th>
                                             <th>#eBay ID</th>
                                             <th>Status</th>
@@ -208,6 +217,7 @@ $(document).ready(function() {
                                                     </a>
                                                 </td>
                                                 <td class="ws">{{ $row->id ?? '' }}</td>
+                                                <td class="ws">{{ $row->user->name ?? '' }}</td>
                                                 <td class="ws">{{ $row->scan_i_package_id ?? '' }}</td>
                                                 <td class="ws">{{ $row->order_number ?? '' }}</td>
                                                 <td class="ws"><span class=" badge badge-pill badge-{{ get_budge_value(order_status($row->order_status)) }}"> {{ order_status($row->order_status) }} </span></td>

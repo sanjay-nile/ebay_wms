@@ -257,6 +257,14 @@ $(document).ready(function() {
                                             </select>
                                         </div>
                                         <div class="form-group col-md-3">
+                                            <select class="form-control" name="user_id">
+                                                <option value="">-- Select Operator -- </option>
+                                                @foreach($operators as $k => $code)
+                                                    <option value="{{ $code->id }}">{{ $code->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-3">
                                             <input type="hidden" name="export_to" id="export_to" value="">
                                             <button type="submit" class="btn btn-Search" id="search-btn">Search</button>
                                             <a href="{{ route('admin.add.scan.in') }}" class="btn btn-Reset">Reset</a>
@@ -284,6 +292,7 @@ $(document).ready(function() {
                                     <tr>
                                         <th>Action</th>
                                         <th>#Id</th>
+                                        <th>Assigned Operator</th>
                                         <th>Scan In Date</th>
                                         <th>Scan In Age</th>
                                         <th>Scan In User</th>
@@ -306,6 +315,7 @@ $(document).ready(function() {
                                                 </a>
                                             </td>
                                             <td class="ws">{{ $row->id ?? '' }}</td>
+                                            <td class="ws">{{ $row->user->name ?? '' }}</td>
                                             <td class="ws" style="white-space: nowrap;">{!! date('d-m-Y H:i:s', strtotime($row->created_at)) !!}</td>
                                             <td class="ws" style="white-space: nowrap;">{{ $row->created_at->startOfDay()->diffInDays(now()->startOfDay()) }} Days</td>
                                             <td class="ws">{{ $row->authorized_by ?? '' }}</td>

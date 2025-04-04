@@ -322,6 +322,10 @@ class WarehouseController extends Controller
             $get_order->where('posts.id', $request->order_id);
         }
 
+        if($request->filled('user_id')){
+            $get_order->where('posts.post_author_id', $request->user_id);
+        }
+
         $get_order->where(['posts.post_type' => 'scan']);
         $get_order->select(
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_status' ORDER BY id DESC LIMIT 1) as order_status"),
@@ -342,6 +346,7 @@ class WarehouseController extends Controller
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'sale_date' ORDER BY id DESC LIMIT 1) as sale_date"),
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'scan_dispatch_date' ORDER BY id DESC LIMIT 1) as scan_dispatch_date"),
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'scan_dispatch_time' ORDER BY id DESC LIMIT 1) as scan_dispatch_time"),
+            DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'scan_dispatch_user' ORDER BY id DESC LIMIT 1) as scan_dispatch_user"),
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'tracking_number' ORDER BY id DESC LIMIT 1) as tracking_number"),
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'weight' ORDER BY id DESC LIMIT 1) as weight"),
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'length' ORDER BY id DESC LIMIT 1) as length"),
@@ -367,7 +372,9 @@ class WarehouseController extends Controller
             $orders = [];
         }
 
-        return view('pages.admin.warehouse.all-scan-out-list', compact('orders'));
+        $operators = User::where('user_type_id', 7)->get();
+
+        return view('pages.admin.warehouse.all-scan-out-list', compact('orders', 'operators'));
     }
 
     /**
@@ -402,6 +409,10 @@ class WarehouseController extends Controller
 
         if(Auth::user()->user_type_id==7){
             $get_order->where('posts.post_author_id', Auth::id());
+        }
+
+        if($request->filled('user_id')){
+            $get_order->where('posts.post_author_id', $request->user_id);
         }
 
         $get_order->where(['posts.post_type' => 'scan']);
@@ -719,6 +730,10 @@ class WarehouseController extends Controller
             $get_order->where('posts.post_author_id', Auth::id());
         }*/
 
+        if($request->filled('user_id')){
+            $get_order->where('posts.post_author_id', $request->user_id);
+        }
+
         $get_order->where(['posts.post_type' => 'scan']);
         $get_order->select(
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_status' ORDER BY id DESC LIMIT 1) as order_status"),
@@ -817,6 +832,10 @@ class WarehouseController extends Controller
             $get_order->where('posts.post_author_id', Auth::id());
         }
 
+        if($request->filled('user_id')){
+            $get_order->where('posts.post_author_id', $request->user_id);
+        }
+
         $get_order->where(['posts.post_type' => 'scan']);
         $get_order->select(
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_status') as order_status"),
@@ -842,8 +861,9 @@ class WarehouseController extends Controller
         $orders = $get_order->orderBy('posts.id', $sort)->paginate($this->perPage);
         $Warehouse = Warehouse::all();
         $clients = User::where('user_type_id', 3)->get();
+        $operators = User::where('user_type_id', 7)->get();
 
-        return view('pages.admin.warehouse.cancelled-list', compact('orders'));
+        return view('pages.admin.warehouse.cancelled-list', compact('orders', 'operators'));
     }
 
 
@@ -909,6 +929,7 @@ class WarehouseController extends Controller
                     $row->tracking_number ?? '',
                     $so_dt,
                     $dis_dt,
+                    $row->scan_dispatch_user ?? '',
                     $row->weight ?? '',
                     $dim,
                     $reason,
@@ -1100,8 +1121,10 @@ class WarehouseController extends Controller
             $get_order = (new Post)->newQuery();
             $get_order->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
             $get_order->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
+            if ($request->has('order_number') && $request->filled('order_number')) {
+                $get_order->join('post_extras AS p3', 'posts.id', '=', 'p3.post_id')->where([['p3.key_name','order_number'],['p3.key_value', '=' ,$request->order_number]]);
+            }
             $post = $get_order->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->first();
-
             if (empty($post)) {
                 // return response()->json(['message' => 'If your package id is '.$request->scan_i_package_id.'. Please recheck once by searching only last xxxxx-xxxx', 'status' => 200], 200);
                 return response()->json(['message' => 'Please Search for the package ID using the Date and Item serial number only by removing the prefix "SC-ORD-" Example: 07022025-54321', 'status' => 200], 200);
@@ -1111,6 +1134,9 @@ class WarehouseController extends Controller
             $chk = (new Post)->newQuery();
             $chk->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
             $chk->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
+            if ($request->has('order_number') && $request->filled('order_number')) {
+                $chk->join('post_extras AS p3', 'posts.id', '=', 'p3.post_id')->where([['p3.key_name','order_number'],['p3.key_value', '=' ,$request->order_number]]);
+            }
             $chk->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereNotIn('pes.key_value', ['IS-07', 'IS-02', 'IS-01']);
             $Check = $chk->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
             if (!$Check->isEmpty()) {
@@ -1141,7 +1167,7 @@ class WarehouseController extends Controller
             $his = new StatusHistory;
             $his->post_id = $post->id;
             $his->addition_info = 'Scan out to dispatch detail.';
-            $his->type = 'dispatch';
+            $his->type = 'scan-out';
             $his->status_date = date('Y-m-d');
             $his->status_time = date('H:i:s');
             $his->user = Auth::user()->name;
@@ -1155,8 +1181,11 @@ class WarehouseController extends Controller
 
                 $chk_order = (new Post)->newQuery();
                 $chk_order->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
+                if ($request->has('order_number') && $request->filled('order_number')) {
+                    $chk_order->join('post_extras AS p3', 'posts.id', '=', 'p3.post_id')->where([['p3.key_name','order_number'],['p3.key_value', '=' ,$request->order_number]]);
+                }
                 $chk_order->select(
-                    DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_number') as order_number")
+                    DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_number') as order_number")
                 );
                 $ord = $chk_order->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->first();
                 // dd($ord);
@@ -1356,7 +1385,7 @@ class WarehouseController extends Controller
                     # store the user log...
                     $his = new StatusHistory;
                     $his->post_id = $post['id'];
-                    $his->addition_info = 'Scan out into dispatch detail.';
+                    $his->addition_info = 'Ready for dispatch into dispatched detail.';
                     $his->type = 'dispatch';
                     $his->status_date = date('Y-m-d');
                     $his->status_time = date('H:i:s');
@@ -1654,6 +1683,10 @@ class WarehouseController extends Controller
             $get_order->where('posts.id', $request->order_id);
         }
 
+        if($request->filled('user_id')){
+            $get_order->where('posts.post_author_id', $request->user_id);
+        }
+
         $get_order->where(['posts.post_type' => 'scan']);
         $get_order->select(
             DB::raw("(select key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'authorized_by') as authorized_by"),
@@ -1681,8 +1714,9 @@ class WarehouseController extends Controller
         $orders = $get_order->orderBy('posts.id', $sort)->paginate($this->perPage);
         $Warehouse = Warehouse::all();
         $clients = User::where('user_type_id', 3)->get();
+        $operators = User::where('user_type_id', 7)->get();
 
-        return view('pages.admin.warehouse.location-move', compact('orders'));
+        return view('pages.admin.warehouse.location-move', compact('orders', 'operators'));
     }
 
 
@@ -1900,7 +1934,7 @@ class WarehouseController extends Controller
                         DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_email') as ship_to_email"),
                         DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_phone') as ship_to_phone"),
                         DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_address_1') as ship_to_address_1"),
-                        DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_address_1') as ship_to_address_2"),
+                        DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_address_2') as ship_to_address_2"),
                         DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_city') as ship_to_city"),
                         DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_state') as ship_to_state"),
                         DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'ship_to_zip') as ship_to_zip"),
@@ -2079,7 +2113,7 @@ class WarehouseController extends Controller
                         # store the user log...
                         $his = new StatusHistory;
                         $his->post_id = $value['id'];
-                        $his->addition_info = 'Scan out into dispatch detail.';
+                        $his->addition_info = 'Generate label and move into dispatched detail.';
                         $his->type = 'dispatch';
                         $his->status_date = date('Y-m-d');
                         $his->status_time = date('H:i:s');
@@ -2421,6 +2455,16 @@ class WarehouseController extends Controller
                         $order->save();
                     }
 
+                    # store the user log...
+                    $his = new StatusHistory;
+                    $his->post_id = $post_id;
+                    $his->addition_info = 'Cron insert in to based on the location data.';
+                    $his->type = 'cron-location';
+                    $his->status_date = date('Y-m-d');
+                    $his->status_time = date('H:i:s');
+                    $his->user = 'Ecom-Cron';
+                    $his->save();
+
                     $data['scan_i_package_id'] = $pallet->package_id;
                     $data['scan_i_location_id'] = $pallet->pallet_id;
                     foreach ($data as $key => $value) {
@@ -2532,6 +2576,7 @@ class WarehouseController extends Controller
      * store assign operator
      */
     public function assignOperatorToItem(Request $request){
+        DB::beginTransaction();
         try {
             $data = $request->only(['user_id', 'order_ids', 'cancel_reason']);
             if ($request->has('form_type') && $request->form_type == 'cancel') {
@@ -2570,9 +2615,10 @@ class WarehouseController extends Controller
                     Post::whereIn('id', $data['order_ids'])->update(['post_author_id' => $data['user_id']]);
                 }
             }
-
+            DB::commit();
             return response()->json(['message' => 'Action successfully.', 'status' => 201], 201);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json(['message' => $e->getMessage(), 'status' => 200], 200);
         }
     }
@@ -2626,6 +2672,10 @@ class WarehouseController extends Controller
                 return response()->json(['message' => 'Data does not exists.', 'status' => 200], 200);
             }
 
+            if (get_post_extra($post->id, 'order_status') == 'IS-04' || get_post_extra($post->id, 'order_status') == 'IS-05') {
+                return response()->json(['message' => 'The package has already been dispatched. Please check the Processed Packages under ’Dispatch Data for details', 'status' => 200], 200);
+            }
+
             if ($post) {
                 if ($request->filled('dis_date')) {
                     set_post_key_value($post->id, 'scan_dispatch_date', $request->dis_date);
@@ -2636,6 +2686,7 @@ class WarehouseController extends Controller
                 set_post_key_value($post->id, 'scan_dispatch_time', date('H:i:s'));
                 set_post_key_value($post->id, 'scan_dispatch_user', Auth::user()->name);
                 set_post_key_value($post->id, 'order_status', 'IS-04');
+                set_post_key_value($post->id, 'dispatch_type', 'manual');
 
                 if ($request->filled('tracking_number')) {
                     set_post_key_value($post->id, 'tracking_number', $request->tracking_number);
@@ -2644,6 +2695,16 @@ class WarehouseController extends Controller
                 if ($request->filled('scan_i_location_id')) {
                     set_post_key_value($post->id, 'scan_i_location_id', $request->scan_i_location_id);
                 }
+
+                # store the user log...
+                $his = new StatusHistory;
+                $his->post_id = $post->id;
+                $his->addition_info = 'Moveing into dispatched detail.';
+                $his->type = 'move-dispatch';
+                $his->status_date = date('Y-m-d');
+                $his->status_time = date('H:i:s');
+                $his->user = Auth::user()->name;
+                $his->save();
             }
 
             return response()->json(['message' => 'The order has been successfully moved to Dispatch.', 'status' => 201], 201);
@@ -2690,6 +2751,16 @@ class WarehouseController extends Controller
                         $post->location_id      = $Check->scan_i_location_id;
                         $post->save();
                         updateOrCreatePostMeta($post->id, 'scan_i_location_id', $Check->scan_i_location_id);
+
+                        # store the user log...
+                        $his = new StatusHistory;
+                        $his->post_id = $post->id;
+                        $his->addition_info = 'Cron update location data.';
+                        $his->type = 'cron-up-location';
+                        $his->status_date = date('Y-m-d');
+                        $his->status_time = date('H:i:s');
+                        $his->user = 'Ecom-Cron';
+                        $his->save();
                     }
                 }
             }

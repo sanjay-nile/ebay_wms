@@ -210,6 +210,14 @@ $(document).ready(function() {
                                             </select>
                                         </div>
                                         <div class="form-group col-md-3">
+                                            <select class="form-control" name="user_id">
+                                                <option value="">-- Select Operator -- </option>
+                                                @foreach($operators as $k => $code)
+                                                    <option value="{{ $code->id }}">{{ $code->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-3">
                                             <input type="hidden" name="export_to" id="export_to" value="">
                                             <button type="submit" class="btn btn-Search" id="search-btn">Search</button>
                                             <a href="{{ route('admin.cancelled.list') }}" class="btn btn-Reset">Reset</a>

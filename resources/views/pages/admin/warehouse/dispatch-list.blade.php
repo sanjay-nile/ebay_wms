@@ -515,6 +515,14 @@ $(document).ready(function(){
                                             </select>
                                         </div>
                                         <div class="form-group col-md-3">
+                                            <select class="form-control" name="user_id">
+                                                <option value="">-- Select Operator -- </option>
+                                                @foreach($operators as $k => $code)
+                                                    <option value="{{ $code->id }}">{{ $code->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-3">
                                             <select class="form-control" name="per_page">
                                                 <option value="">-- Per Page-- </option>
                                                 <option value="100">100</option>
@@ -578,10 +586,14 @@ $(document).ready(function(){
                                             <th>eBay Order Received Date</th>
                                             <th>Scan Out Date</th>
                                             <th>Scan Out User</th>
-                                            <th>Dispatch Date</th>
                                             @if($status != 'new')
+                                                <th>Dispatch Date</th>
+                                                <th>Dispatch User</th>
                                                 <th>Weight</th>
                                                 <th>Dims</th>
+                                            @else
+                                                <th>Order Age</th>
+                                                <th>Order OverDue</th>
                                             @endif
                                             <th>Status</th> 
                                             <th>Photos</th>
@@ -589,7 +601,32 @@ $(document).ready(function(){
                                     </thead>
                                     <tbody>
                                         @forelse($orders as $row)
-                                            <tr class="@if($row->order_type == 'combined') bg-purple text-white @endif">
+                                            @php
+                                                $currentDate = \Carbon\Carbon::now();
+                                                $givenDate = \Carbon\Carbon::parse(date('Y-m-d', strtotime($row->sale_date))); // Replace with your date
+
+                                                /*$startDate = $givenDate;
+                                                $endDate = $currentDate;
+                                                $start = \Carbon\Carbon::parse($startDate);
+                                                $end = \Carbon\Carbon::parse($endDate);
+                                                $period = \Carbon\CarbonPeriod::create($start, $end);
+                                                $businessDays = 0;
+                                                foreach ($period as $date) {
+                                                    if (!$date->isWeekend()) { // Excludes Saturdays and Sundays
+                                                        $businessDays++;
+                                                    }
+                                                }*/
+
+                                                $daysDifference = $currentDate->diffInDays($givenDate);
+                                                $difference = $daysDifference - 3;
+                                                $cl = '';
+                                                if($difference == 1){
+                                                    $cl = 'table-warning';
+                                                } elseif($difference >= 2){
+                                                    $cl = 'table-danger';
+                                                }
+                                            @endphp
+                                            <tr class="@if($row->order_type == 'combined') bg-purple text-white @endif @if($status == 'new') {{ $cl }} @endif">
                                                 @if($row->order_status == 'IS-03' && $status == 'new')
                                                     <td style="text-align: center;"><input name="order_ids[]" value="{{ $row->id }}" type="checkbox" class="selectone" /></td>
                                                 @endif
@@ -617,13 +654,21 @@ $(document).ready(function(){
                                                 <td class="ws" style="white-space: nowrap;">@if(!empty($row->sale_date)) {!! date('d-m-Y H:i:s', strtotime($row->sale_date)) !!} @endif</td>
                                                 <td class="ws" style="white-space: nowrap;">@if(!empty($row->scan_out_date)) {!! date('d-m-Y', strtotime($row->scan_out_date)) !!} {!! date('H:i:s', strtotime($row->scan_out_time)) !!} @endif</td>
                                                 <td class="ws">{{ $row->scan_out_user ?? '' }}</td>
-                                                <td class="ws" style="white-space: nowrap;">
-                                                    @if(!empty($row->scan_dispatch_date)) {!! date('d-m-Y', strtotime($row->scan_dispatch_date)) !!} @endif
-                                                    @if(!empty($row->scan_dispatch_time)) {!! date('H:i:s', strtotime($row->scan_dispatch_time)) !!} @endif
-                                                </td>
                                                 @if($status != 'new')
+                                                    <td class="ws" style="white-space: nowrap;">
+                                                        @if(!empty($row->scan_dispatch_date)) {!! date('d-m-Y', strtotime($row->scan_dispatch_date)) !!} @endif
+                                                        @if(!empty($row->scan_dispatch_time)) {!! date('H:i:s', strtotime($row->scan_dispatch_time)) !!} @endif
+                                                    </td>
+                                                    <td class="ws">{{ $row->scan_dispatch_user ?? '' }}</td>
                                                     <td class="ws">{{ $row->weight ?? '' }}</td>
                                                     <td class="ws">@if(!empty($row->length)) {{ $row->length ?? '' }} X {{ $row->width ?? '' }} X {{ $row->height ?? '' }} @endif</td>
+                                                @else
+                                                    <td class="ws" style="white-space: nowrap;">
+                                                        +{{ $daysDifference }} Days
+                                                    </td>
+                                                    <td class="ws" style="white-space: nowrap;">
+                                                        {{ sprintf('%+d', $difference) }} Days
+                                                    </td>
                                                 @endif
                                                 <td class="ws"><span class=" badge badge-pill badge-{{ get_budge_value(order_status($row->order_status)) }}"> {{ order_status($row->order_status) }} </span></td>
                                                 <td class="ws">

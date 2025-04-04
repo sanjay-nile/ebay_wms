@@ -300,6 +300,12 @@ $(document).ready(function() {
                                         <input type="text" class="form-control" name="scan_i_package_id" placeholder="ORD-0-8763874237-0000037" value="">
                                     </div>
                                 </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="">eBay ID</label>
+                                        <input type="text" class="form-control" name="order_number" placeholder="87-63874-23700" value="">
+                                    </div>
+                                </div>
                                 <div class="col-md-3 mt-2">
                                     <div class="form-group">
                                         <button class="btn-Submit add-btn btn-sm" type="submit">Save</button>

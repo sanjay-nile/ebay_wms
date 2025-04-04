@@ -648,35 +648,35 @@ class ApiOpreatorController extends Controller
                return response()->json(['message' => 'Location ID not found. Please contact the warehouse supervisor to check ShipCycle whether this item is assigned to a Pallet and to a location and then try again', 'status' => 400], 400);
            }
 
-           # check the dispatch validation here...
-           $chk_P = (new Post)->newQuery();
-           $chk_P->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
-           $chk_P->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-03', 'IS-04', 'IS-05']);
-           $CheckP = $chk_P->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
-           if (!$CheckP->isEmpty()) {
+            # check the dispatch validation here...
+            $chk_P = (new Post)->newQuery();
+            $chk_P->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
+            $chk_P->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-03', 'IS-04', 'IS-05']);
+            $CheckP = $chk_P->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
+            if (!$CheckP->isEmpty()) {
                return response()->json(['message' => "This item is already included in the Dispatch list.", 'status' => 400], 400);
-           }
+            }
 
-           $chk_D = (new Post)->newQuery();
-           $chk_D->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
-           $chk_D->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
-           $chk_D->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-03', 'IS-04', 'IS-04']);
-           $CheckD = $chk_D->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
-           if (!$CheckD->isEmpty()) {
+            $chk_D = (new Post)->newQuery();
+            $chk_D->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
+            $chk_D->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
+            $chk_D->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-03', 'IS-04', 'IS-04']);
+            $CheckD = $chk_D->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
+            if (!$CheckD->isEmpty()) {
                return response()->json(['message' => "This item is already included in the Dispatch list.", 'status' => 400], 400);
-           }
+            }
 
-           # check the other valition here...
-           $chk = (new Post)->newQuery();
-           $chk->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
-           $chk->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
-           $chk->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-01', 'IS-02', 'IS-07', 'IS-06']);
-           $Check = $chk->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
-           if (!$Check->isEmpty()) {
+            # check the other valition here...
+            $chk = (new Post)->newQuery();
+            $chk->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
+            $chk->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
+            $chk->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-01', 'IS-02', 'IS-07', 'IS-06']);
+            $Check = $chk->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
+            if (!$Check->isEmpty()) {
                return response()->json(['message' => "This package has already been scanned at this location: ".$request->scan_i_location_id.". To move it to a different location, please use the Move to Location section.", 'status' => 400], 400);
-           }
+            }
 
-           if($request->file('images')){
+            if($request->file('images')){
                $data['scan_in_images'] = [];
                foreach ($request->file('images') as $image) {
                    // $image = $request->file('image');
@@ -691,7 +691,7 @@ class ApiOpreatorController extends Controller
                    Storage::disk('public_uploads')->put('order/'.$imagename, $propertyimage);
                    $data['scan_in_images'][] = 'order/'.$imagename;
                }
-           }
+            }
 
             // code...
             $package = (new Post)->newQuery();
@@ -741,7 +741,7 @@ class ApiOpreatorController extends Controller
            $his = new StatusHistory;
            $his->post_id = $post_id;
            $his->addition_info = 'Add Scan In detail.';
-           $his->type = 'scan_in';
+           $his->type = 'mob-scan_in';
            $his->status_date = date('Y-m-d');
            $his->status_time = date('H:i:s');
            $his->local_time = $data['create_system_time']; // Fetch local time;
@@ -785,6 +785,7 @@ class ApiOpreatorController extends Controller
             # chek alreday scan out or not...
             $chk = (new Post)->newQuery();
             $chk->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $request->scan_i_package_id]]);
+            $chk->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','scan_i_location_id'],['p2.key_value', '=' ,$request->scan_i_location_id]]);
             $chk->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereNotIn('pes.key_value', ['IS-07', 'IS-02', 'IS-01']);
             $Check = $chk->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
             if (!$Check->isEmpty()) {
@@ -835,7 +836,7 @@ class ApiOpreatorController extends Controller
             $his = new StatusHistory;
             $his->post_id = $post->id;
             $his->addition_info = 'Scan out to dispatch detail.';
-            $his->type = 'dispatch';
+            $his->type = 'mob-scan-out';
             $his->status_date = date('Y-m-d');
             $his->status_time = date('H:i:s');
             $his->user = Auth::user()->name;
@@ -1012,8 +1013,8 @@ class ApiOpreatorController extends Controller
                     # store the user log...
                     $his = new StatusHistory;
                     $his->post_id = $post['id'];
-                    $his->addition_info = 'Scan out into dispatch detail.';
-                    $his->type = 'dispatch';
+                    $his->addition_info = 'Ready for dispatch into dispatch detail.';
+                    $his->type = 'mob-dispatch';
                     $his->status_date = date('Y-m-d');
                     $his->status_time = date('H:i:s');
                     $his->user = Auth::user()->name;
@@ -1050,7 +1051,7 @@ class ApiOpreatorController extends Controller
                     $his = new StatusHistory;
                     $his->post_id = $value;
                     $his->addition_info = 'Scan out into cancelled dispatch.';
-                    $his->type = 'cancelled';
+                    $his->type = 'mob-cancelled';
                     $his->status_date = date('Y-m-d');
                     $his->status_time = date('H:i:s');
                     $his->user = Auth::user()->name;

@@ -15,6 +15,85 @@
 </style>
 @endpush
 
+@push('scripts')
+<script>
+$(document).ready(function() {
+    $.ajaxSetup({
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        }
+    });
+
+    toastr.options ={
+       "closeButton" : true,
+       "progressBar" : true,
+       "disableTimeOut" : true,
+       "timeOut": "5000",
+    }
+
+    $("#ebay-order-form").on('submit',function(e){
+        e.preventDefault();
+        var form = $(this);
+        let formData = new FormData(this);
+        var curSubmit = $(this).find("button.add-btn");
+        $.ajax({
+            type : 'post',
+            url : form.attr('action'),
+            data : formData,
+            dataType: 'json',
+            contentType: false,
+            processData: false,
+            beforeSend : function(){
+                curSubmit.html(`Sending.. <i class="la la-spinner la-spin"></i>`).attr('disabled',true);
+            },
+            success : function(response){                    
+                if(response.status==201){
+                    curSubmit.html(`Submit`).attr('disabled',false);
+                    toastr.success(response.message);
+                    setTimeout(function () {
+                        location.reload(true);
+                    }, 1000);
+                    return false;
+                }
+
+                if(response.status==200){                   
+                    curSubmit.html(`Submit`).attr('disabled',false);
+                    toastr.error(response.message);
+                    return false;
+                }
+            },
+            error : function(data){
+                if(data.status==422){
+                    let li_htm = '';
+                    $.each(data.responseJSON.errors,function(k,v){
+                        const $input = form.find(`input[name=${k}],select[name=${k}],textarea[name=${k}]`);
+                        if($input.next('small').length){
+                            $input.next('small').html(v);
+                            if(k == 'type_of_place' || k == 'safety' || k == 'p_value' || k == 'amenities' || k == 'features'){
+                                $('.'+k).html(`<small class='text-danger'>${v[0]}</small>`);
+                            }
+                        }else{
+                            $input.after(`<small class='text-danger'>${v}</small>`);
+                            if(k == 'type_of_place' || k == 'safety' || k == 'p_value' || k == 'amenities' || k == 'features'){
+                                $('.'+k).html(`<small class='text-danger'>${v[0]}</small>`);
+                            }
+                        }
+                        li_htm += `<li>${v}</li>`;
+                    });
+                    curSubmit.html(`Submit`).attr('disabled',false);
+                    return false;
+                }else{                  
+                    curSubmit.html(`Submit`).attr('disabled',false);
+                    toastr.error(data.statusText);
+                    return false;
+                }
+            }
+        });
+    });
+});
+</script>
+@endpush
+
 @section('content')
 
     <div class="app-content content">
@@ -60,6 +139,42 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- <div class="col-xs-12 col-md-12">
+                    <div class="card booking-info-box">
+                        <div class="card-content">
+                            <div class="card-body">
+                                <div class="info-list-section">
+                                    <form method="post" action="{{ route('admin.ebay.order') }}" enctype="multipart/form-data" id="ebay-order-form">
+                                        @csrf
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label>eBay Order ID</label>
+                                                    <input type="text" name="ebay_id" class="form-control" value="" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label>eBay Data Type</label>
+                                                    <select class="form-control" name="order_type" required>
+                                                        <option value="fetch" selected> Fetch </option>
+                                                        <option value="cancel"> Cancel </option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mt-2">
+                                                <div class="form-group">
+                                                    <button type="submit" class="btn btn-red add-btn">Submit</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> --}}
             </div>
         </div>
     </div>

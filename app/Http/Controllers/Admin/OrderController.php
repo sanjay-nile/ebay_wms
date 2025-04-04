@@ -427,10 +427,10 @@ class OrderController extends Controller
                     $url = $next_url;
                 } else {
                     $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T07:00:00.000Z..".$t_d."T".$ct_t.".999Z%5D&limit=200&offset=".$offset;
-                    /*$url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T00:00:00.000Z..".$t_d."T23:59:59.999Z%5D&limit=200&offset=".$offset;
-                    $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T00:00:00.000Z..".$t_d."T".$ct_t.".999Z%5D&limit=50&offset=".$offset;
-                    $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T07:00:00.000Z..".$t_d."T23:59:59.999Z%5D";*/
-                    // $url = $response['api_url']."/sell/fulfillment/v1/order?orderIds=18-12709-91456";
+                    // $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T00:00:00.000Z..".$t_d."T23:59:59.999Z%5D&limit=200&offset=".$offset;
+                    // $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T00:00:00.000Z..".$t_d."T".$ct_t.".999Z%5D&limit=50&offset=".$offset;
+                    // $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T07:00:00.000Z..".$t_d."T23:59:59.999Z%5D";
+                    // $url = $response['api_url']."/sell/fulfillment/v1/order?orderIds=11-12873-79509";
                 }
 
                 Log::channel('shopify_order')->info($url);
@@ -493,6 +493,10 @@ class OrderController extends Controller
                 foreach ($response->orders as $key => $value) {
                     #check the ebay order id..
                     if (empty($value->orderId)) {
+                        continue;
+                    }
+
+                    if (isset($value->orderPaymentStatus) && $value->orderPaymentStatus == 'FULLY_REFUNDED') {
                         continue;
                     }
 
@@ -567,14 +571,26 @@ class OrderController extends Controller
                                 $postExtra['ebay_cancel_order_status'] = $value->cancelStatus->cancelState;
                                 $postExtra['cancle_date'] = $value->cancelStatus->cancelledDate ?? '';
                                 $postExtra['cancelRequests'] = json_encode($value->cancelStatus->cancelRequests);
-                            }                            
+                            }
 
-                            // $Check = PostExtra::where(['key_name' => 'scan_i_package_id', 'key_value' => $sku])->get();
-                            // $order->join('post_extras AS p2', 'posts.id', '=', 'p2.post_id')->where([['p2.key_name','order_number'],['p2.key_value', '=' , $value->orderId]]);
+                            # chek alreday dispatch or not...
+                            $chk = (new Post)->newQuery();
+                            $chk->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $sku]]);
+                            $chk->join('post_extras AS p3', 'posts.id', '=', 'p3.post_id')->where([['p3.key_name','order_number'],['p3.key_value', '=' , $value->orderId]]);
+                            $chk->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id')->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-04', 'IS-05', 'IS-03']);
+                            $Check_Dis = $chk->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
+                            if ($Check_Dis->isNotEmpty()) {
+                                continue;
+                            }
+
+                            sleep(5); // Waits for 2 seconds
+
                             $order = (new Post)->newQuery();
                             $order->join('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','scan_i_package_id'],['p1.key_value', '=' , $sku]]);
                             $order->select(
                                 DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_status') as order_status"),
+                                DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'scan_dispatch_date') as scan_dispatch_date"),
+                                DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'tracking_number') as tracking_number"),
                                 DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'order_number') as order_number"),
                                 DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'scan_i_location_id') as scan_i_location_id"),
                                 'posts.id'
@@ -582,12 +598,12 @@ class OrderController extends Controller
                             $Check = $order->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
 
                             // dd($Check);
-                            if (!$Check->isEmpty()) {
+                            Log::channel('shopify_order')->info('fetch data from db:- '. json_encode($Check->toArray()));
+                            if ($Check->isNotEmpty()) {
                                 Log::channel('shopify_order')->info('Already Inserted item ref:- '.$sku);
                                 foreach ($Check as $ck => $cv) {
-                                    if (!empty($cv->order_number) && $cv->order_number == $value->orderId && in_array($cv->order_status, ['IS-01', 'IS-02', 'IS-07'])) {
+                                    if (empty($cv->scan_dispatch_date) && empty($cv->tracking_number) && !empty($cv->order_number) && $cv->order_number == $value->orderId && in_array($cv->order_status, ['IS-01', 'IS-02', 'IS-07'])) {
                                         foreach ($postExtra as $p_key => $p_value) {
-                                            // updateOrCreatePostMeta($cv->id, $p_key, $p_value);
                                             set_post_key_value($cv->id, $p_key, $p_value);
                                         }
 
@@ -596,10 +612,17 @@ class OrderController extends Controller
                                             'ebay_date' => date('Y-m-d H:i:s', strtotime($value->creationDate))
                                         ]);
 
-                                        DB::commit();
-                                    } elseif (empty($cv->order_number) && in_array($cv->order_status, ['IS-01', 'IS-02', 'IS-07'])) {
+                                        # store the user log...
+                                        $his = new StatusHistory;
+                                        $his->post_id = $cv->id;
+                                        $his->addition_info = 'Cron Move into Scan out detail.';
+                                        $his->type = 'cron-scan-out';
+                                        $his->status_date = date('Y-m-d');
+                                        $his->status_time = date('H:i:s');
+                                        $his->user = 'Ecom-Cron';
+                                        $his->save();
+                                    } elseif (empty($cv->scan_dispatch_date) && empty($cv->tracking_number) && empty($cv->order_number) && in_array($cv->order_status, ['IS-01', 'IS-02', 'IS-07'])) {
                                         foreach ($postExtra as $p_key => $p_value) {
-                                            // updateOrCreatePostMeta($cv->id, $p_key, $p_value);
                                             set_post_key_value($cv->id, $p_key, $p_value);
                                         }
 
@@ -607,6 +630,16 @@ class OrderController extends Controller
                                             'ebay_id' => $value->orderId,
                                             'ebay_date' => date('Y-m-d H:i:s', strtotime($value->creationDate))
                                         ]);
+
+                                        # store the user log...
+                                        $his = new StatusHistory;
+                                        $his->post_id = $cv->id;
+                                        $his->addition_info = 'Cron Move into Scan out detail.';
+                                        $his->type = 'cron-scan-out';
+                                        $his->status_date = date('Y-m-d');
+                                        $his->status_time = date('H:i:s');
+                                        $his->user = 'Ecom-Cron';
+                                        $his->save();
 
                                         DB::commit();
                                     } elseif (!empty($cv->order_number) && $cv->order_number != $value->orderId) {
@@ -648,54 +681,67 @@ class OrderController extends Controller
                                                     set_post_key_value($post->id, $p_key, $p_value);
                                                 }
 
-                                                DB::commit();
                                                 $count += 1;
                                                 $flag = true;
                                             }
                                         }
                                     }
 
-                                    sleep(2); // Waits for 2 seconds
+                                    DB::commit();
+                                    sleep(1); // Waits for 2 seconds
                                 }
+
                                 continue;
                             }
+                            
+                            if ($Check->isEmpty()) {
+                                # insert the data...
+                                $post                   = new Post;
+                                $post->post_author_id   = 1;
+                                $post->post_content     = 'Scan order';
+                                $post->post_title       = 'Scan order';
+                                $post->post_slug        = Str::slug('Scan order', '-');
+                                $post->parent_id        = 0;
+                                $post->post_status      = 1;
+                                $post->post_type        = 'scan';
+                                $post->package_id       = $sku;
+                                $post->ebay_id          = $value->orderId;
+                                $post->ebay_date        = date('Y-m-d H:i:s', strtotime($value->creationDate));
+                                
+                                $postExtra['scan_i_location_id'] = '';
+                                $postExtra['authorized_by']     = 'Ecom';
+                                $postExtra['scan_out_user']     = 'Ecom';
+                                $postExtra['scan_out_date']     = date('Y-m-d');
+                                $postExtra['scan_out_time']     = date('H:i:s');
+                                $postExtra['scan_i_package_id'] = $sku;
+                                
+                                if ($post->save()) {
+                                    Log::channel('shopify_order')->info('Insert item ref:- '.$sku);
+                                    foreach ($postExtra as $p_key => $p_value) {
+                                        updateOrCreatePostMeta($post->id, $p_key, $p_value);
+                                    }
 
-                            # insert the data...
-                            $post                   = new Post;
-                            $post->post_author_id   = 1;
-                            $post->post_content     = 'Scan order';
-                            $post->post_title       = 'Scan order';
-                            $post->post_slug        = Str::slug('Scan order', '-');
-                            $post->parent_id        = 0;
-                            $post->post_status      = 1;
-                            $post->post_type        = 'scan';
-                            $post->package_id       = $sku;
-                            $post->ebay_id          = $value->orderId;
-                            $post->ebay_date        = date('Y-m-d H:i:s', strtotime($value->creationDate));
-                            
-                            $postExtra['scan_i_location_id'] = '';
-                            $postExtra['authorized_by']     = 'Ecom';
-                            $postExtra['scan_out_user']     = 'Ecom';
-                            $postExtra['scan_out_date']     = date('Y-m-d');
-                            $postExtra['scan_out_time']     = date('H:i:s');
-                            $postExtra['scan_i_package_id'] = $sku;
-                            
-                            if ($post->save()) {
-                                Log::channel('shopify_order')->info('Insert item ref:- '.$sku);
-                                foreach ($postExtra as $p_key => $p_value) {
-                                    updateOrCreatePostMeta($post->id, $p_key, $p_value);
+                                    # store the user log...
+                                    $his = new StatusHistory;
+                                    $his->post_id = $post->id;
+                                    $his->addition_info = 'Cron insert in to scan out.';
+                                    $his->type = 'cron-ins-scan-out';
+                                    $his->status_date = date('Y-m-d');
+                                    $his->status_time = date('H:i:s');
+                                    $his->user = 'Ecom-Cron';
+                                    $his->save();
+
+                                    DB::commit();
+                                    $count += 1;
+                                    $flag = true;
                                 }
-
-                                DB::commit();
-                                $count += 1;
-                                $flag = true;
                             }
                         }
                     }
                 }
 
                 // Pause execution for 5 seconds
-                sleep(5);
+                sleep(2);
                 if ($offset <= 10) {
                     $this->getOrdersFromEbay($offset + 1, $response->next ?? '');
                 }
@@ -728,7 +774,6 @@ class OrderController extends Controller
                 $f_d = date("Y-m-d", strtotime("-20 day"));
                 $t_d = $currentTimePST->format('Y-m-d');
                 $ct_t = $currentTimePST->format('H:i:s');
-                // dd([$f_d, $t_d, $ct_t]);
                 
                 # check all the orders from ebay...
                 if ($offset > 0) {
@@ -741,6 +786,7 @@ class OrderController extends Controller
                     $url = $next_url;
                 } else {
                     $url = $response['api_url']."/sell/fulfillment/v1/order?filter=creationdate:%5B".$f_d."T00:00:00.000Z..".$t_d."T23:59:59.999Z%5D&limit=200&offset=".$offset;
+                    // $url = $response['api_url']."/sell/fulfillment/v1/order?orderIds=01-12843-07150,25-12815-07281,14-12829-82522,03-12847-18639,18-12840-81882,09-12852-53000,14-12847-03600";
                 }
 
                 Log::channel('shopify_order')->info('Cancel Url:- '.$url);
@@ -789,6 +835,7 @@ class OrderController extends Controller
             }
 
             $orders = json_decode($response, true);
+            // echo '<pre>'; print_r($orders); die;
             $flag = false;
             $count = 0;
             if (!empty($orders['orders'])) {
@@ -805,7 +852,7 @@ class OrderController extends Controller
 
                         $chk = (new Post)->newQuery();
                         $chk->leftJoin('post_extras AS p1', 'posts.id', '=', 'p1.post_id')->where([['p1.key_name','order_number'],['p1.key_value', '=' , $order['orderId']]]);
-                        $chk->leftJoin('post_extras AS pe', 'posts.id', '=', 'pe.post_id')->where([['pe.key_name','order_status']])->whereIn('pe.key_value', ['IS-01','IS-07', 'IS-02']);
+                        $chk->leftJoin('post_extras AS pe', 'posts.id', '=', 'pe.post_id')->where([['pe.key_name','order_status']])->whereIn('pe.key_value', ['IS-01','IS-07', 'IS-02', 'IS-03']);
                         $Check = $chk->where('posts.post_type', 'scan')->orderBy('posts.id', 'DESC')->get();
                         if (!$Check->isEmpty()) {
                             foreach ($Check as $ck => $cv) {
@@ -823,7 +870,7 @@ class OrderController extends Controller
 
                 // dd($canceledOrders);
                 // Pause execution for 5 seconds
-                sleep(5);
+                sleep(2);
                 if ($offset <= 20) {
                     $this->getCancelOrdersFromEbay($offset + 1, $orders['next'] ?? '');
                 }
@@ -839,6 +886,41 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
             return ['status' => 'error', 'msg' => $e->getMessage()];
+        }
+    }
+
+
+    /**
+     * fetch and cancel ebay order from the api
+     */
+    public function fetchOrCancelEbayOrder(Request $request){
+        try {
+            $response = $this->checkEbayConfigration();
+            if(isset($response['type'])){
+                return response()->json(['message' => $response['msg'], 'status' => 200], 200);
+            }
+
+            $result = json_decode($response['response']);
+            if (isset($result->access_token)) {
+                $offset = 25;
+                $url = $response['api_url']."/sell/fulfillment/v1/order?orderIds=".$request->ebay_id;
+                if ($request->order_type == 'fetch') {
+                    $all_order = $this->getAllOrdersWithToken($result->access_token, $url, $offset);
+                } else {
+                    $all_order = $this->getCancellationOrdersFromEbay($result->access_token, $url, $offset);
+                }
+
+                $status = 201;
+                if ($all_order['status'] == 'error') {
+                    $status = 200;
+                }
+
+                Log::channel('shopify_order')->info('ebay order id:- '.$request->ebay_id);
+                Log::channel('shopify_order')->info($all_order['msg']);
+                return response()->json(['message' => $all_order['msg'], 'status' => $status], $status);
+            }
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage(), 'status' => 200], 200);
         }
     }
 }

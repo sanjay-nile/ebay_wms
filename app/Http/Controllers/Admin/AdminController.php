@@ -135,6 +135,9 @@ class AdminController extends Controller {
         $total_sub_admin = User::where(['user_type_id'=>2])->count();
         $total_opreator = User::where(['user_type_id'=>7])->count();
 
+        $end_f = Carbon::now()->startOfDay();
+        $end_t =  Carbon::now()->endOfDay();
+
         $scan_in = (new Post)->newQuery();
         $scan_in->leftJoin('post_extras AS pes', 'posts.id', '=', 'pes.post_id');
         if ($request->has('start_date') && $request->has('end_date') && !empty($request->start_date) && !empty($request->end_date)) {
@@ -142,8 +145,6 @@ class AdminController extends Controller {
             $end_t = Carbon::parse($request->end_date);
             $scan_in->whereDate('posts.created_at', '>=', $end_f->format('Y-m-d'))->whereDate('posts.created_at', '<=', $end_t->format('Y-m-d'));
         } else {
-            $end_f = Carbon::now()->startOfDay();
-            $end_t =  Carbon::now()->endOfDay();
             $scan_in->whereDate('posts.created_at', '>=', $end_f->format('Y-m-d'))->whereDate('posts.created_at', '<=', $end_t->format('Y-m-d'));
         }
         $total_scan_in = $scan_in->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-01'])->where(['posts.post_type' => 'scan'])->count();
@@ -155,12 +156,12 @@ class AdminController extends Controller {
             $end_t = Carbon::parse($request->end_date);
             $scan_out->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
             $scan_out->where([['dt.key_name','scan_out_date']])->whereDate('dt.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('dt.key_value', '<=', $end_t->format('Y-m-d'));
-        } else {
+        } /*else {
             $end_f = Carbon::now()->startOfDay();
             $end_t =  Carbon::now()->endOfDay();
             $scan_out->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
             $scan_out->where([['dt.key_name','scan_out_date']])->whereDate('dt.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('dt.key_value', '<=', $end_t->format('Y-m-d'));
-        }
+        }*/
         $total_scan_out = $scan_out->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-02', 'IS-07'])->where(['posts.post_type' => 'scan'])->count();
 
 
@@ -172,8 +173,6 @@ class AdminController extends Controller {
             $dispatch->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
             $dispatch->where([['dt.key_name','scan_dispatch_date']])->whereDate('dt.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('dt.key_value', '<=', $end_t->format('Y-m-d'));
         } else {
-            $end_f = Carbon::now()->startOfDay();
-            $end_t =  Carbon::now()->endOfDay();
             $dispatch->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
             $dispatch->where([['dt.key_name','scan_dispatch_date']])->whereDate('dt.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('dt.key_value', '<=', $end_t->format('Y-m-d'));
         }
@@ -187,45 +186,66 @@ class AdminController extends Controller {
             $end_t = Carbon::parse($request->end_date);
             $pen_dis->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
             $pen_dis->where([['dt.key_name','scan_out_date']])->whereDate('dt.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('dt.key_value', '<=', $end_t->format('Y-m-d'));
-        } else {
+        } /*else {
             $end_f = Carbon::now()->startOfDay();
             $end_t =  Carbon::now()->endOfDay();
             $pen_dis->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
             $pen_dis->where([['dt.key_name','scan_out_date']])->whereDate('dt.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('dt.key_value', '<=', $end_t->format('Y-m-d'));
-        }
+        }*/
         $pending_dispatch = $pen_dis->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-03'])->where(['posts.post_type' => 'scan'])->count();
 
         # per hour data....
+        ##############################################################
         $scan_in_hr = (new Post)->newQuery();
         $scan_in_hr->leftJoin('post_extras AS pes', 'posts.id', '=', 'pes.post_id');
-        $total_scan_in_hr = $scan_in_hr->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-01'])->whereBetween('posts.created_at', [now()->subHour()->subMinute(), now()->subHour()])->count();
+        $scan_in_hr->select(DB::raw("ROUND(COUNT(id) / (IF(DATEDIFF('".$end_t->format('Y-m-d')."', '".$end_f->format('Y-m-d')."') = 0, 1 , DATEDIFF('".$end_t->format('Y-m-d')."', '".$end_f->format('Y-m-d')."')) * 9), 2) AS avg_per_day"));
+        $scan_in_hr->whereDate('posts.created_at', '>=', $end_f->format('Y-m-d'))->whereDate('posts.created_at', '<=', $end_t->format('Y-m-d'));
+        $scanin = $scan_in_hr->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-01'])->first();
+        $total_scan_in_hr = $scanin->avg_per_day;
+
 
         $scan_out_hr = (new Post)->newQuery();
         $scan_out_hr->leftJoin('post_extras AS pes', 'posts.id', '=', 'pes.post_id');
         $scan_out_hr->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
-        $scan_out_hr->where([['dt.key_name','scan_out_time']])->whereBetween('dt.created_at', [now()->subHour()->subMinute(), now()->subHour()]);
-        // $scan_out_hr->where([['dt.key_name','scan_out_time']])->where('dt.updated_at', '>=', Carbon::now()->subHour());
-        $total_scan_out_hr = $scan_out_hr->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-02', 'IS-07'])->count();
+        $scan_out_hr->select(DB::raw("ROUND(COUNT(id) / (IF(DATEDIFF('".$end_t->format('Y-m-d')."', '".$end_f->format('Y-m-d')."') = 0, 1 , DATEDIFF('".$end_t->format('Y-m-d')."', '".$end_f->format('Y-m-d')."')) * 9), 2) AS avg_per_day"));
+        $scan_out_hr->where([['dt.key_name','scan_out_time']])->whereDate('dt.created_at', '>=', $end_f->format('Y-m-d'))->whereDate('dt.created_at', '<=', $end_t->format('Y-m-d'));
+        $toscanOut = $scan_out_hr->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-02', 'IS-07'])->first();
+        $total_scan_out_hr = $toscanOut->avg_per_day;
+
 
         $dis_hr = (new Post)->newQuery();
         $dis_hr->leftJoin('post_extras AS pes', 'posts.id', '=', 'pes.post_id');
         $dis_hr->leftJoin('post_extras AS dt', 'posts.id', '=', 'dt.post_id');
-        $dis_hr->where([['dt.key_name','scan_dispatch_time']])->whereBetween('dt.created_at', [now()->subHour()->subMinute(), now()->subHour()]);
-        // $dis_hr->where([['dt.key_name','scan_dispatch_time']])->where('dt.updated_at', '>=', Carbon::now()->subHour());
-        $total_dispatch_hr = $dis_hr->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-04', 'IS-05'])->count();
+        $dis_hr->select(DB::raw("ROUND(COUNT(id) / (IF(DATEDIFF('".$end_t->format('Y-m-d')."', '".$end_f->format('Y-m-d')."') = 0, 1 , DATEDIFF('".$end_t->format('Y-m-d')."', '".$end_f->format('Y-m-d')."')) * 9), 2) AS avg_per_day"));
+        $dis_hr->where([['dt.key_name','scan_dispatch_time']])->whereDate('dt.created_at', '>=', $end_f->format('Y-m-d'))->whereDate('dt.created_at', '<=', $end_t->format('Y-m-d'));
+        $totalDispatch = $dis_hr->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-04', 'IS-05'])->first();
+        $total_dispatch_hr = $totalDispatch->avg_per_day;
 
         $today = Carbon::today();
         $pending_pick = (new Post)->newQuery();
-        $pending_pick->leftJoin('post_extras AS sd', 'posts.id', '=', 'sd.post_id');
-        $pending_pick->leftJoin('post_extras AS pes', 'posts.id', '=', 'pes.post_id');
+        $pending_pick->join('post_extras AS pes', 'posts.id', '=', 'pes.post_id');
         if ($request->has('start_date') && $request->has('end_date') && !empty($request->start_date) && !empty($request->end_date)) {
+            $pending_pick->join('post_extras AS sd', 'posts.id', '=', 'sd.post_id');
             $end_f = Carbon::parse($request->start_date);
             $end_t = Carbon::parse($request->end_date);
             $pending_pick->where([['sd.key_name','sale_date']])->whereDate('sd.key_value', '>=', $end_f->format('Y-m-d'))->whereDate('sd.key_value', '<=', $end_t->format('Y-m-d'));
-        } else {
-            $pending_pick->where([['sd.key_name','sale_date']])->whereRaw('DATEDIFF(NOW(), sd.key_value) > ?', [3]);   
         }
-        $total_op_orders = $pending_pick->where([['pes.key_name','order_status']])->whereIn('pes.key_value', ['IS-02', 'IS-07'])->where(['posts.post_type' => 'scan'])->count();
+        $pending_pick->select(
+            DB::raw("(select DISTINCT key_value from post_extras where posts.id = post_extras.post_id and post_extras.key_name = 'sale_date') as sale_date"),
+            'posts.*'
+        );
+        $op_orders = $pending_pick->where('pes.key_name','order_status')->whereIn('pes.key_value', ['IS-02', 'IS-07'])->where('posts.post_type', 'scan')->get();
+
+        $total_op_orders = 0;
+        foreach ($op_orders as $key => $value) {
+            $currentDate = \Carbon\Carbon::now();
+            $givenDate = \Carbon\Carbon::parse(date('Y-m-d', strtotime($value->sale_date)));
+            $daysDifference = $currentDate->diffInDays($givenDate);
+            $difference = $daysDifference - 3;
+            if($difference >= 1){
+                $total_op_orders = $total_op_orders+1;
+            }
+        }
 
         return response()->json([
             'total_sub_admin' => $total_sub_admin,
